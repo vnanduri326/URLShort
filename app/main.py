@@ -31,6 +31,13 @@ def shorten_url(payload: schema.CreateUrl, request: Request, db: Session = Depen
     base_url = str(request.base_url).rstrip('/')
     return schema.UrlResponse(short_url=f"{base_url}/{db_item.short_url}", target_url=db_item.original_url, short_code=db_item.short_url)
 
+@app.get("/stats/{code}", response_model=schema.UrlStatsResponse, status_code=status.HTTP_200_OK, summary="Get stats for a short URL")
+def get_url_stats(code: str, db: Session = Depends(get_db)):
+    db_item = db.query(models.URL).filter(models.URL.short_url == code).first()
+    if not db_item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short URL not found")
+    return schema.UrlStatsResponse(short_code=db_item.short_url, target_url=db_item.original_url, clicks=db_item.clicks, created_at=db_item.created_at)
+
 @app.get("/{code}", response_class=RedirectResponse, status_code=status.HTTP_307_TEMPORARY_REDIRECT, summary="Redirect to the original URL")
 def redirect_to_original_url(code: str, db: Session = Depends(get_db)):
     db_item = db.query(models.URL).filter(models.URL.short_url == code).first()
@@ -40,9 +47,3 @@ def redirect_to_original_url(code: str, db: Session = Depends(get_db)):
     db.commit()
     return RedirectResponse(url=db_item.original_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
-@app.get("/stats/{code}", response_model=schema.UrlStatsResponse, status_code=status.HTTP_200_OK, summary="Get stats for a short URL")
-def get_url_stats(code: str, db: Session = Depends(get_db)):
-    db_item = db.query(models.URL).filter(models.URL.short_url == code).first()
-    if not db_item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short URL not found")
-    return schema.URLStatsResponse(short_url=db_item.short_url, target_url=db_item.original_url, clicks=db_item.clicks, created_at=db_item.created_at)
